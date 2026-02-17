@@ -1,0 +1,8 @@
+{
+  "temperature": 0.05,
+  "max_tokens": 612,
+  "system_prompt": "You are a helpful AI assistant. Answer clearly and simply.",
+  "context_turns": 7,
+  "stream_output": true,
+  "model": "deepseek-coder:1.3b"
+}
