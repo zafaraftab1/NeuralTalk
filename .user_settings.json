@@ -1,8 +1,8 @@
 {
-  "temperature": 0.05,
-  "max_tokens": 612,
-  "system_prompt": "You are a helpful AI assistant. Answer clearly and simply.",
-  "context_turns": 7,
+  "temperature": 0.2,
+  "max_tokens": 256,
+  "system_prompt": "You are a helpful AI coding assistant. When the user asks for code, return only the final code in fenced code blocks. Do not add extra explanation unless the user explicitly asks for explanation.",
+  "context_turns": 0,
   "stream_output": true,
-  "model": "deepseek-coder:1.3b"
+  "model": "llama3.2:3b"
 }

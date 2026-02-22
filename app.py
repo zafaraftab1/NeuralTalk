@@ -45,6 +45,26 @@ CODE_RULES = (
     "Do not add explanatory text. "
     "Do not add line-by-line comments unless user explicitly asks for comments."
 )
+CODE_REQUEST_HINT = (
+    "IMPORTANT: Return exactly one fenced code block and nothing else. "
+    "No explanation text, no notes, no analysis."
+)
+CODE_REQUEST_KEYWORDS = (
+    "code",
+    "function",
+    "script",
+    "program",
+    "implement",
+    "generator",
+    "class",
+    "api",
+    "algorithm",
+    "query",
+    "sql",
+    "fix",
+    "debug",
+    "refactor",
+)
 
 
 def now_ts() -> str:
@@ -190,6 +210,26 @@ def build_chain():
     return prompt | llm
 
 
+def build_code_chain():
+    template = (
+        "System instruction:\n{system_prompt}\n\n"
+        "User coding request:\n{question}\n\n"
+        "Output rules:\n"
+        "- Return only one markdown fenced code block.\n"
+        "- No explanation text.\n"
+        "- No prefixes like 'Sure' or 'Here is'.\n\n"
+        "Assistant:"
+    )
+    prompt = PromptTemplate.from_template(template)
+    llm = OllamaLLM(
+        model=st.session_state["model"],
+        base_url=st.session_state["base_url"],
+        num_predict=int(st.session_state["max_tokens"]),
+        temperature=float(st.session_state["temperature"]),
+    )
+    return prompt | llm
+
+
 def append_message(chat: dict, role: str, content: str, latency: float | None = None):
     entry = {
         "role": role,
@@ -279,28 +319,182 @@ def compose_prompt(user_text: str, files) -> tuple[str, str]:
     return full_prompt, display_text
 
 
-def generate_reply(chat: dict, question: str, on_update=None) -> str:
-    chain = build_chain()
-    effective_system_prompt = f"{CODE_RULES}\n\n{st.session_state['system_prompt']}"
-    inputs = {
-        "question": question,
-        "system_prompt": effective_system_prompt,
-        "history": chat_history_text(chat, int(st.session_state["context_turns"])),
-    }
+def is_code_request(user_text: str) -> bool:
+    text = (user_text or "").strip().lower()
+    if not text:
+        return False
+    return any(keyword in text for keyword in CODE_REQUEST_KEYWORDS)
 
-    if st.session_state["stream_output"] and hasattr(chain, "stream"):
-        chunks = []
-        for chunk in chain.stream(inputs):
-            chunks.append(str(chunk))
-            if on_update is not None:
-                on_update("".join(chunks))
-        return "".join(chunks).strip()
 
-    response = chain.invoke(inputs)
-    text = str(response).strip()
-    if on_update is not None:
-        on_update(text)
+def wants_code_comments(user_text: str) -> bool:
+    text = (user_text or "").strip().lower()
+    if not text:
+        return False
+    return "comment" in text or "explain" in text
+
+
+def _normalize_fences(text: str) -> str:
+    # Normalize malformed fences such as ` ` ` python into ```python.
+    return re.sub(r"`\s*`\s*`", "```", text)
+
+
+def _sanitize_code(code: str, allow_comments: bool) -> str:
+    lines = code.splitlines()
+    cleaned = []
+    for line in lines:
+        stripped = line.strip()
+        if not stripped:
+            cleaned.append("")
+            continue
+
+        if not allow_comments:
+            if stripped.startswith("#") or stripped.startswith("//") or stripped.startswith("--"):
+                continue
+            if "#" in line:
+                head, tail = line.split("#", 1)
+                # Drop verbose narrative comments but keep short code comments if present.
+                if len(tail.split()) > 4:
+                    line = head.rstrip()
+                    stripped = line.strip()
+                    if not stripped:
+                        continue
+            if re.search(r"\b(user|assistant|console)\b", stripped, flags=re.IGNORECASE):
+                if not re.search(r"[=(){}\[\]:,+\-*/]", stripped):
+                    continue
+            # Remove obviously broken assignment line like: x =
+            if re.match(r"^\s*[A-Za-z_][A-Za-z0-9_]*\s*=\s*$", line):
+                continue
+
+        cleaned.append(line.rstrip())
+
+    # Trim extra blank lines at top/bottom.
+    while cleaned and not cleaned[0].strip():
+        cleaned.pop(0)
+    while cleaned and not cleaned[-1].strip():
+        cleaned.pop()
+    return "\n".join(cleaned)
+
+
+def _extract_first_fenced_code(text: str) -> str | None:
+    normalized = _normalize_fences(text)
+    pattern = re.compile(r"```[ \t]*([a-zA-Z0-9_+\-]*)[ \t]*\n?(.*?)```", re.DOTALL)
+    match = pattern.search(normalized)
+    if not match:
+        return None
+    language = (match.group(1) or "").strip()
+    code = (match.group(2) or "").strip("\n")
+    if language:
+        return f"```{language}\n{code}\n```"
+    return f"```\n{code}\n```"
+
+
+def postprocess_code_response(text: str, code_mode: bool, allow_comments: bool = False) -> str:
+    if not code_mode:
+        return text
+
+    normalized = _normalize_fences(text).strip()
+
+    # Fast path: already valid fenced code from the model.
+    full_fence = re.fullmatch(r"```[ \t]*[a-zA-Z0-9_+\-]*[ \t]*\n?.*?```", normalized, re.DOTALL)
+    if full_fence:
+        return normalized
+
+    # Fallback: extract first fenced block if model added surrounding prose.
+    fenced = _extract_first_fenced_code(text)
+    if fenced:
+        return fenced
+
+    # Last resort: detect likely code and wrap as fenced block.
+    lines = [line for line in normalized.splitlines() if line.strip()]
+    code_start_tokens = (
+        "def ",
+        "class ",
+        "import ",
+        "from ",
+        "if ",
+        "for ",
+        "while ",
+        "return ",
+        "const ",
+        "let ",
+        "var ",
+        "function ",
+        "#include",
+        "package ",
+        "public ",
+        "private ",
+        "SELECT ",
+        "INSERT ",
+        "UPDATE ",
+        "DELETE ",
+    )
+    start_idx = None
+    for idx, line in enumerate(lines):
+        stripped = line.lstrip()
+        if stripped.startswith(code_start_tokens):
+            start_idx = idx
+            break
+
+    if start_idx is not None:
+        code = "\n".join(lines[start_idx:]).strip()
+        code = _sanitize_code(code, allow_comments=allow_comments)
+        return f"```python\n{code}\n```"
+
     return text
+
+
+def generate_reply(
+    chat: dict,
+    question: str,
+    on_update=None,
+    code_mode: bool = False,
+    allow_comments: bool = False,
+) -> str:
+    try:
+        effective_question = (
+            f"{question}\n\n{CODE_REQUEST_HINT}"
+            if code_mode
+            else question
+        )
+        if code_mode:
+            chain = build_code_chain()
+            effective_system_prompt = f"{st.session_state['system_prompt']}\n\n{CODE_RULES}"
+            inputs = {
+                "question": effective_question,
+                "system_prompt": effective_system_prompt,
+            }
+        else:
+            chain = build_chain()
+            effective_system_prompt = f"{CODE_RULES}\n\n{st.session_state['system_prompt']}"
+            inputs = {
+                "question": effective_question,
+                "system_prompt": effective_system_prompt,
+                "history": chat_history_text(chat, int(st.session_state["context_turns"])),
+            }
+
+        if st.session_state["stream_output"] and hasattr(chain, "stream"):
+            chunks = []
+            for chunk in chain.stream(inputs):
+                chunks.append(str(chunk))
+                if on_update is not None:
+                    on_update("".join(chunks))
+            text = "".join(chunks).strip()
+            text = postprocess_code_response(text, code_mode, allow_comments=allow_comments)
+            if on_update is not None:
+                on_update(text)
+            return text
+
+        response = chain.invoke(inputs)
+        text = str(response).strip()
+        text = postprocess_code_response(text, code_mode, allow_comments=allow_comments)
+        if on_update is not None:
+            on_update(text)
+        return text
+    except Exception as e:
+        error_msg = f"Connection Error: Cannot reach Ollama at {st.session_state['base_url']}. Please ensure Ollama is running.\n\nDetails: {str(e)}"
+        if on_update is not None:
+            on_update(error_msg)
+        return error_msg
 
 
 def set_chat_title_if_needed(chat: dict, user_text: str) -> None:
@@ -311,29 +505,56 @@ def set_chat_title_if_needed(chat: dict, user_text: str) -> None:
 def render_content_blocks(content: str, target) -> None:
     code_pattern = re.compile(r"```([a-zA-Z0-9_+-]*)\n(.*?)```", re.DOTALL)
     matches = list(code_pattern.finditer(content))
+
+    # Wrap text content in assistant message bubble
     if not matches:
-        target.markdown(content)
+        safe_text = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        target.markdown(
+            f'<div class="message-row assistant-row"><div class="assistant-message-bubble">{safe_text}</div></div>',
+            unsafe_allow_html=True,
+        )
         return
 
-    # If code exists, show only the code blocks to avoid unnecessary text noise.
+    # If code exists, alternate between text and code blocks
+    last_end = 0
     for match in matches:
+        # Show text before code block
+        before_text = content[last_end:match.start()].strip()
+        if before_text:
+            safe_text = before_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+            target.markdown(
+                f'<div class="message-row assistant-row"><div class="assistant-message-bubble">{safe_text}</div></div>',
+                unsafe_allow_html=True,
+            )
+
+        # Use Streamlit native code rendering for syntax highlighting.
         language = match.group(1).strip() or None
         code_text = match.group(2).rstrip("\n")
         target.code(code_text, language=language)
+        last_end = match.end()
+
+    # Show remaining text after last code block
+    after_text = content[last_end:].strip()
+    if after_text:
+        safe_text = after_text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        target.markdown(
+            f'<div class="message-row assistant-row"><div class="assistant-message-bubble">{safe_text}</div></div>',
+            unsafe_allow_html=True,
+        )
 
 
 def render_message(role: str, content: str, latency: float | None = None, target=None) -> None:
     if target is None:
         target = st
+
     if role == "user":
-        col_spacer, col_right = target.columns([0.3, 0.7])
-        with col_right:
-            safe_text = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
-            st.markdown(f'<div class="user-pill">{safe_text}</div>', unsafe_allow_html=True)
+        safe_text = content.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;").replace("\n", "<br>")
+        target.markdown(
+            f'<div class="message-row user-row"><div class="user-message-bubble">{safe_text}</div></div>',
+            unsafe_allow_html=True,
+        )
     else:
-        col_left, col_spacer = target.columns([0.78, 0.22])
-        with col_left:
-            render_content_blocks(content, st)
+        render_content_blocks(content, target)
 
 
 def request_submit() -> None:
@@ -357,8 +578,8 @@ def parse_chat_value(chat_value):
 init_state()
 active_chat = get_active_chat()
 
-content_left, content_mid, content_right = st.columns([1.2, 7.6, 1.2])
-with content_mid:
+chat_rail = st.container()
+with chat_rail:
     st.markdown(
         '<div class="title-wrap"><h1 class="app-title">AI Assistant (Ollama + LangChain)</h1></div>',
         unsafe_allow_html=True,
@@ -366,16 +587,29 @@ with content_mid:
 st.markdown(
     """
     <style>
+    :root {
+        --chat-rail-width: 860px;
+    }
     .main .block-container {
+        max-width: var(--chat-rail-width);
+        margin-left: auto;
+        margin-right: auto;
         padding-bottom: 8rem;
     }
     [data-testid="stChatInput"] {
-        max-width: 920px;
+        max-width: none !important;
+        width: 100% !important;
         margin-left: auto;
         margin-right: auto;
     }
+    [data-testid="stChatInput"] > div {
+        max-width: var(--chat-rail-width) !important;
+        width: 100% !important;
+        margin-left: auto !important;
+        margin-right: auto !important;
+    }
     .title-wrap {
-        max-width: 920px;
+        max-width: var(--chat-rail-width);
         margin-left: auto;
         margin-right: auto;
     }
@@ -408,23 +642,65 @@ st.markdown(
         padding-left: 0.8rem !important;
         padding-right: 0.8rem !important;
     }
-    .user-pill {
+    .message-row {
+        display: flex;
+        width: 100%;
+        max-width: var(--chat-rail-width);
+        margin: 0.08rem auto;
+    }
+    .assistant-row {
+        justify-content: flex-start;
+    }
+    .user-row {
+        justify-content: flex-end;
+    }
+    .user-message-bubble {
         display: inline-block;
-        margin-left: auto;
         width: fit-content;
-        max-width: 80%;
-        padding: 0.55rem 0.8rem;
-        border-radius: 16px;
-        background: rgba(60, 130, 255, 0.15);
-        border: 1px solid rgba(60, 130, 255, 0.35);
-        line-height: 1.45;
+        max-width: 95%;
+        padding: 0.75rem 1rem;
+        border-radius: 18px;
+        background-color: #0084ff;
+        color: white;
+        line-height: 1.5;
         word-break: break-word;
+        font-size: 0.95rem;
+    }
+    .assistant-message-bubble {
+        display: inline-block;
+        width: fit-content;
+        max-width: 95%;
+        padding: 0.75rem 1rem;
+        border-radius: 18px;
+        background-color: #e5e5ea;
+        color: #000;
+        line-height: 1.5;
+        word-break: break-word;
+        font-size: 0.95rem;
+    }
+    .assistant-code-block {
+        width: min(95%, 100%);
+        border-radius: 12px;
+        border: 1px solid rgba(120, 120, 120, 0.35);
+        background-color: #f5f5f5;
+        overflow-x: auto;
+    }
+    .assistant-code-block pre {
+        margin: 0;
+        padding: 0.75rem 0.95rem;
+        font-size: 0.92rem;
+        line-height: 1.5;
+        font-family: "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace;
+    }
+    .assistant-code-block code {
+        white-space: pre;
     }
     div[data-testid="stCodeBlock"] pre {
         font-size: 0.92rem !important;
         line-height: 1.5 !important;
         border-radius: 10px !important;
         border: 1px solid rgba(120, 120, 120, 0.35) !important;
+        background-color: #f5f5f5 !important;
     }
     div[data-testid="stCodeBlock"] code {
         font-family: "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace !important;
@@ -508,7 +784,7 @@ with st.sidebar:
     save_persisted_settings()
 
 for msg in active_chat["messages"]:
-    with content_mid:
+    with chat_rail:
         role = msg.get("role", "assistant")
         content = msg.get("content", "")
         latency = msg.get("latency_seconds")
@@ -520,24 +796,30 @@ user_text, attached_files = parse_chat_value(chat_value)
 if chat_value and (user_text.strip() or attached_files):
     active_chat = get_active_chat()
     full_prompt, display_prompt = compose_prompt(user_text.strip(), attached_files)
+    code_mode = is_code_request(user_text)
+    allow_comments = wants_code_comments(user_text)
 
     set_chat_title_if_needed(active_chat, user_text)
-    with content_mid:
+    with chat_rail:
         render_message("user", display_prompt)
 
-    with content_mid:
+    with chat_rail:
         assistant_placeholder = st.empty()
+
     with st.spinner("Thinking..."):
         start = time.time()
         try:
             answer = generate_reply(
                 active_chat,
                 full_prompt,
+                code_mode=code_mode,
+                allow_comments=allow_comments,
                 on_update=lambda partial: render_message("assistant", partial, target=assistant_placeholder),
             )
         except Exception as exc:
             answer = f"Error: {exc}"
-            render_message("assistant", answer, target=assistant_placeholder)
+            with assistant_placeholder.container():
+                render_message("assistant", answer, target=st)
         elapsed = time.time() - start
 
     append_message(active_chat, "user", display_prompt)
