@@ -1,3 +1,4 @@
+# An advanced AI assistant demo using Streamlit, Ollama, and LangChain.
 import time
 import uuid
 from datetime import datetime
