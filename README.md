@@ -1,32 +1,99 @@
-# AI Assistant (Streamlit + Ollama + LangChain)
+<div align="center">
 
-Local chat UI for Ollama models with a Streamlit frontend and LangChain prompt orchestration.
+# Neural Talk
 
-## What It Does
+### A stylish local AI chat workspace built with Streamlit, Ollama, and LangChain
 
-- Runs a local chat assistant against an Ollama model
-- Supports multiple chats in the sidebar
-- Persists UI settings in `.user_settings.json`
-- Streams responses when enabled
-- Accepts multiple file attachments in the chat input
-- Extracts text from common text files and PDFs
-- Tries to force clean fenced-code output for coding requests
-- Renders assistant code blocks with syntax highlighting
+<p>
+  <img src="https://img.shields.io/badge/Python-3.10%2B-2F6FED?style=for-the-badge&logo=python&logoColor=white" />
+  <img src="https://img.shields.io/badge/Streamlit-Frontend-FF5C8A?style=for-the-badge&logo=streamlit&logoColor=white" />
+  <img src="https://img.shields.io/badge/Ollama-Local%20LLM-111827?style=for-the-badge" />
+  <img src="https://img.shields.io/badge/LangChain-Orchestration-10B981?style=for-the-badge" />
+</p>
 
-## Current App Behavior
+<p>
+  Bright visuals. Local models. Multi-chat workflow. File-aware prompting.
+</p>
 
-The app is implemented in [app.py](/Users/zafaraftab/Stream_Lit/app.py). It:
+</div>
 
-- Defaults to `deepseek-coder:1.3b`
-- Connects to Ollama at `http://localhost:11434`
-- Uses full same-chat history by default with `context_turns = 0`
-- Saves these settings between runs:
-  - `model`
-  - `temperature`
-  - `max_tokens`
-  - `system_prompt`
-  - `context_turns`
-  - `stream_output`
+---
+
+## Overview
+
+`Neural Talk` is a local-first AI assistant interface for running Ollama models inside a custom Streamlit chat UI.
+
+It is designed around a polished chat experience:
+
+- multi-chat sidebar navigation
+- colorful branded interface
+- file attachments directly in the composer
+- streamed model responses
+- code-oriented response cleanup for coding prompts
+- persistent user settings between runs
+
+## Why This Project Feels Different
+
+This is not a plain demo chat window. The app is set up as a more presentation-focused workspace with:
+
+- a styled hero section and branded sidebar
+- custom user and assistant message bubbles
+- syntax-highlighted code blocks
+- local Ollama model switching from the sidebar
+- prompt augmentation from attached files
+
+## Core Features
+
+### Chat Experience
+
+- Create and switch between multiple chats
+- Keep per-session chat history in Streamlit state
+- Use full same-chat memory by default
+- Stream responses for lower perceived latency
+
+### Model Controls
+
+- Choose from installed Ollama models
+- Adjust temperature
+- Set max token output
+- Customize the system prompt
+- Control how many prior turns are sent as context
+
+### File-Aware Prompts
+
+Attach files using the built-in `+` button in the chat input.
+
+Supported parsing:
+
+- Text files: `.txt`, `.md`, `.py`, `.json`, `.csv`, `.log`, `.yaml`, `.yml`, `.xml`, `.html`, `.js`, `.ts`, `.java`, `.go`, `.rs`, `.sql`
+- PDF files: `.pdf`
+
+Behavior:
+
+- extracted content is appended into the model prompt
+- unsupported files fall back to metadata-only context
+- extracted text is truncated to `10,000` characters
+- file-only submissions automatically become: `Please analyze the attached files.`
+
+### Code-Focused Output
+
+For code-related prompts, the app switches into a stricter output mode that tries to:
+
+- return a single fenced code block
+- strip extra explanation around code
+- normalize malformed fences
+- preserve comments only if the prompt explicitly asks for them
+
+## Current Defaults
+
+The live app behavior in [app.py](/Users/zafaraftab/Stream_Lit/app.py) currently uses:
+
+- Default model: `deepseek-coder:1.3b`
+- Base URL: `http://localhost:11434`
+- Default temperature: `0.2`
+- Default max tokens: `256`
+- Default context turns: `0` meaning full same-chat history
+- Settings persistence file: `.user_settings.json`
 
 ## Project Structure
 
@@ -36,64 +103,51 @@ The app is implemented in [app.py](/Users/zafaraftab/Stream_Lit/app.py). It:
 ├── assets/
 │   └── neuraltalk_logo.png
 ├── README.md
-└── .user_settings.json   # created/updated at runtime
+└── .user_settings.json
 ```
-
-## Requirements
-
-- Python 3.10+
-- Ollama installed and running locally
-- At least one pulled Ollama model
-
-Python packages used by the app:
-
-- `streamlit`
-- `langchain-core`
-- `langchain-ollama`
-- `pypdf`
 
 ## Quick Start
 
-Create a virtual environment:
+### 1. Create a virtual environment
 
 ```bash
 python3 -m venv .venv
 source .venv/bin/activate
 ```
 
-Install dependencies:
+### 2. Install dependencies
 
 ```bash
 pip install streamlit langchain-core langchain-ollama pypdf
 ```
 
-Start Ollama:
+### 3. Start Ollama
 
 ```bash
 ollama serve
 ```
 
-Pull the default model if needed:
+### 4. Pull the default model if needed
 
 ```bash
 ollama pull deepseek-coder:1.3b
 ```
 
-Run the app:
+### 5. Launch the app
 
 ```bash
 streamlit run app.py
 ```
 
-Open `http://localhost:8501`.
+Open `http://localhost:8501`
 
 ## Sidebar Controls
 
 ### Chats
 
-- Create a new chat
-- Switch between existing chats
-- Active chats are ordered by most recently updated
+- New chat creation
+- Active chat switching
+- Recent-chat ordering
 
 ### Settings
 
@@ -104,57 +158,31 @@ Open `http://localhost:8501`.
 
 ### Advanced
 
-- `Context turns (0 = full chat memory)`
+- `Context turns`
 - `Stream output`
-
-## File Attachments
-
-Use the built-in `+` control in the chat input to attach multiple files.
-
-Supported text extraction:
-
-- Text-like files: `.txt`, `.md`, `.py`, `.json`, `.csv`, `.log`, `.yaml`, `.yml`, `.xml`, `.html`, `.js`, `.ts`, `.java`, `.go`, `.rs`, `.sql`
-- PDF files: `.pdf` through `pypdf`
-
-Behavior:
-
-- Parsed file contents are appended to the prompt sent to the model
-- Non-text files fall back to metadata-only context
-- Extracted file content is truncated to 10,000 characters
-- If only files are attached, the app sends: `Please analyze the attached files.`
-
-## Coding Responses
-
-If the prompt looks like a coding request, the app switches into a stricter code-oriented mode. That mode attempts to:
-
-- request exactly one fenced code block
-- strip surrounding explanation when possible
-- normalize malformed code fences
-- preserve comments only when the prompt asks for comments or explanation
-
-The code-request detection is keyword-based, so it is heuristic rather than guaranteed.
 
 ## Notes
 
-- Model discovery in the sidebar uses `ollama list`
-- If Ollama is unavailable, the app shows a connection error in the chat
-- Chat history is kept in Streamlit session state and is not persisted to disk
+- Installed model discovery uses `ollama list`
+- If Ollama is unavailable, the app returns a connection error in the chat
+- Chat messages are not persisted to disk
+- UI settings are persisted to `.user_settings.json`
 
 ## Troubleshooting
 
-If no models appear:
+### No model appears in the selector
 
 ```bash
 ollama list
 ```
 
-If Ollama is not responding:
+### Ollama is not responding
 
 ```bash
 ollama serve
 ```
 
-If PDF parsing fails, ensure `pypdf` is installed:
+### PDF text extraction is unavailable
 
 ```bash
 pip install pypdf
@@ -162,4 +190,10 @@ pip install pypdf
 
 ## Security
 
-Attached file contents are inserted into prompts sent to your local model. Do not upload secrets unless that is acceptable for your local environment.
+Attached file contents are included in prompts sent to your local model. Do not upload secrets unless that is acceptable for your environment.
+
+---
+
+<div align="center">
+  Built for a more beautiful local AI workflow.
+</div>
