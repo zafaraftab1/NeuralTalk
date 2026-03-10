@@ -6,6 +6,8 @@ from pathlib import Path
 import re
 import json
 import io
+import base64
+import html
 import subprocess
 import streamlit as st
 import streamlit.components.v1 as components
@@ -70,6 +72,14 @@ CODE_REQUEST_KEYWORDS = (
 
 def now_ts() -> str:
     return datetime.now().isoformat(timespec="seconds")
+
+
+def image_data_uri(path: Path) -> str:
+    try:
+        encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+        return f"data:image/png;base64,{encoded}"
+    except Exception:
+        return ""
 
 
 def new_chat(title: str = "New Chat") -> dict:
@@ -578,18 +588,39 @@ def parse_chat_value(chat_value):
 
 init_state()
 active_chat = get_active_chat()
+logo_uri = image_data_uri(Path("assets/neuraltalk_logo.png"))
+hero_model = html.escape(str(st.session_state["model"]))
+hero_chat_count = len(st.session_state["chats"])
+hero_message_count = len(active_chat["messages"])
 
 chat_rail = st.container()
 with chat_rail:
     st.markdown(
-        """
+        f"""
         <div class="hero-shell">
+            <div class="hero-orbit"></div>
             <div class="hero-glow hero-glow-a"></div>
             <div class="hero-glow hero-glow-b"></div>
-            <div class="title-wrap">
-                <div class="hero-kicker">Local-first creative coding studio</div>
-                <h1 class="app-title">Neural Talk</h1>
-                <p class="hero-subtitle">A vivid Ollama chat workspace with multi-thread memory, file-aware prompts, and cleaner code responses.</p>
+            <div class="hero-grid title-wrap">
+                <div class="hero-copy">
+                    <div class="hero-kicker">Local-first creative coding studio</div>
+                    <h1 class="app-title">Neural Talk</h1>
+                    <p class="hero-subtitle">A richer Ollama workspace with polished chat threads, file-aware prompts, and a more editorial visual rhythm.</p>
+                    <div class="hero-pills">
+                        <span class="hero-pill">Model: {hero_model}</span>
+                        <span class="hero-pill">Chats: {hero_chat_count}</span>
+                        <span class="hero-pill">Messages: {hero_message_count}</span>
+                    </div>
+                </div>
+                <div class="hero-brand-card">
+                    <div class="hero-brand-frame">
+                        <img src="{logo_uri}" alt="Neural Talk logo" class="hero-logo" />
+                    </div>
+                    <div class="hero-brand-meta">
+                        <span class="hero-brand-label">Studio mode</span>
+                        <span class="hero-brand-caption">Fast local answers, brighter interface.</span>
+                    </div>
+                </div>
             </div>
         </div>
         """,
@@ -602,24 +633,25 @@ st.markdown(
 
     :root {
         --chat-rail-width: 920px;
-        --page-bg: radial-gradient(circle at top left, rgba(255, 144, 91, 0.30), transparent 24%),
-                   radial-gradient(circle at 85% 12%, rgba(65, 205, 255, 0.28), transparent 22%),
-                   radial-gradient(circle at 50% 100%, rgba(255, 78, 145, 0.22), transparent 30%),
-                   linear-gradient(135deg, #fff4dd 0%, #ffe8ef 34%, #eaf5ff 68%, #eefdf6 100%);
-        --panel-bg: rgba(255, 255, 255, 0.58);
+        --page-bg: radial-gradient(circle at top left, rgba(255, 150, 96, 0.34), transparent 25%),
+                   radial-gradient(circle at 92% 8%, rgba(38, 205, 255, 0.24), transparent 21%),
+                   radial-gradient(circle at 50% 100%, rgba(255, 78, 145, 0.18), transparent 34%),
+                   linear-gradient(145deg, #fff6df 0%, #ffe7d6 22%, #ffe7f2 48%, #e6f5ff 74%, #effff5 100%);
+        --panel-bg: rgba(255, 255, 255, 0.62);
         --panel-border: rgba(255, 255, 255, 0.62);
-        --panel-shadow: 0 24px 80px rgba(194, 88, 51, 0.16);
-        --headline: #1f1d2b;
-        --text: #433b55;
-        --muted: #7a6f8f;
-        --user-gradient: linear-gradient(135deg, #ff6b6b 0%, #ff8e53 42%, #ffb347 100%);
-        --assistant-gradient: linear-gradient(135deg, rgba(255,255,255,0.88) 0%, rgba(245, 251, 255, 0.88) 100%);
-        --assistant-border: rgba(115, 135, 173, 0.18);
+        --panel-shadow: 0 30px 90px rgba(160, 86, 60, 0.16);
+        --headline: #20192d;
+        --text: #44395b;
+        --muted: #796c8f;
+        --user-gradient: linear-gradient(135deg, #ff4f7f 0%, #ff7f50 45%, #ffbf5f 100%);
+        --assistant-gradient: linear-gradient(135deg, rgba(255,255,255,0.9) 0%, rgba(241, 248, 255, 0.92) 100%);
+        --assistant-border: rgba(111, 133, 170, 0.18);
         --accent: #ff5e7e;
         --accent-2: #25b7ff;
         --accent-3: #14c38e;
-        --code-bg: rgba(21, 29, 48, 0.92);
+        --code-bg: linear-gradient(135deg, rgba(17, 24, 39, 0.98), rgba(28, 37, 61, 0.96));
         --code-border: rgba(86, 163, 255, 0.34);
+        --sidebar-card: linear-gradient(145deg, rgba(255,255,255,0.12), rgba(255,255,255,0.04));
     }
     html, body, [class*="css"]  {
         font-family: "Space Grotesk", sans-serif;
@@ -658,9 +690,14 @@ st.markdown(
         padding-bottom: 8rem;
     }
     [data-testid="stSidebar"] {
-        background: linear-gradient(180deg, rgba(34, 25, 55, 0.86) 0%, rgba(32, 48, 79, 0.78) 100%);
-        border-right: 1px solid rgba(255, 255, 255, 0.12);
+        background:
+            radial-gradient(circle at top, rgba(255, 159, 83, 0.22), transparent 22%),
+            linear-gradient(180deg, rgba(34, 25, 55, 0.92) 0%, rgba(26, 34, 62, 0.86) 100%);
+        border-right: 1px solid rgba(255, 255, 255, 0.10);
         backdrop-filter: blur(28px);
+    }
+    [data-testid="stSidebar"] > div:first-child {
+        padding-top: 1rem;
     }
     [data-testid="stSidebar"] * {
         color: #fdf7ff;
@@ -668,20 +705,105 @@ st.markdown(
     [data-testid="stSidebar"] [data-testid="stMarkdownContainer"] p {
         color: #e7dcff;
     }
+    .sidebar-brand {
+        position: relative;
+        overflow: hidden;
+        margin-bottom: 1rem;
+        padding: 1rem;
+        border-radius: 24px;
+        background: linear-gradient(145deg, rgba(255,255,255,0.16), rgba(255,255,255,0.06));
+        border: 1px solid rgba(255,255,255,0.16);
+        box-shadow: 0 18px 44px rgba(6, 11, 32, 0.22);
+    }
+    .sidebar-brand::before {
+        content: "";
+        position: absolute;
+        width: 140px;
+        height: 140px;
+        top: -40px;
+        right: -36px;
+        border-radius: 999px;
+        background: radial-gradient(circle, rgba(255, 191, 95, 0.34), transparent 70%);
+    }
+    .sidebar-brand-top {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        position: relative;
+        z-index: 1;
+    }
+    .sidebar-logo-wrap {
+        width: 56px;
+        height: 56px;
+        border-radius: 18px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        background: linear-gradient(145deg, rgba(255,255,255,0.18), rgba(255,255,255,0.06));
+        border: 1px solid rgba(255,255,255,0.22);
+        box-shadow: inset 0 1px 0 rgba(255,255,255,0.2);
+    }
+    .sidebar-logo {
+        width: 36px;
+        height: 36px;
+        object-fit: contain;
+    }
+    .sidebar-brand-title {
+        margin: 0;
+        font-size: 1.08rem;
+        font-weight: 700;
+        color: #ffffff;
+    }
+    .sidebar-brand-subtitle {
+        margin: 0.18rem 0 0 0;
+        font-size: 0.82rem;
+        line-height: 1.45;
+        color: #e5d9ff;
+    }
+    .sidebar-meta-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.45rem;
+        margin-top: 0.9rem;
+        position: relative;
+        z-index: 1;
+    }
+    .sidebar-chip {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.38rem 0.62rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.12);
+        border: 1px solid rgba(255,255,255,0.14);
+        font-size: 0.72rem;
+        font-weight: 700;
+        color: #fff5ff;
+        letter-spacing: 0.04em;
+        text-transform: uppercase;
+    }
+    .sidebar-section-label {
+        margin: 1rem 0 0.55rem 0;
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #e6ddff;
+    }
     [data-testid="stSidebar"] .stButton > button,
     [data-testid="stSidebar"] .stDownloadButton > button {
-        border-radius: 16px !important;
+        border-radius: 18px !important;
         border: 1px solid rgba(255, 255, 255, 0.16) !important;
-        background: linear-gradient(135deg, rgba(255,255,255,0.16), rgba(255,255,255,0.05)) !important;
+        background: var(--sidebar-card) !important;
         color: #fff9ff !important;
-        box-shadow: none !important;
-        transition: transform 140ms ease, background 140ms ease, border-color 140ms ease !important;
+        box-shadow: 0 10px 22px rgba(8, 12, 30, 0.12) !important;
+        transition: transform 140ms ease, background 140ms ease, border-color 140ms ease, box-shadow 140ms ease !important;
     }
     [data-testid="stSidebar"] .stButton > button:hover,
     [data-testid="stSidebar"] .stDownloadButton > button:hover {
-        transform: translateY(-1px);
+        transform: translateY(-1px) scale(1.01);
         border-color: rgba(255, 197, 106, 0.45) !important;
         background: linear-gradient(135deg, rgba(255, 170, 95, 0.34), rgba(255,255,255,0.10)) !important;
+        box-shadow: 0 14px 28px rgba(8, 12, 30, 0.16) !important;
     }
     [data-testid="stSidebar"] .stSlider label,
     [data-testid="stSidebar"] .stSelectbox label,
@@ -722,10 +844,12 @@ st.markdown(
     }
     .hero-shell {
         position: relative;
-        margin: 0 auto 1.25rem auto;
-        padding: 2.25rem 2rem 1.4rem 2rem;
-        border-radius: 32px;
-        background: linear-gradient(135deg, rgba(255,255,255,0.72), rgba(255,255,255,0.38));
+        margin: 0 auto 1.4rem auto;
+        padding: 2.2rem 2rem 1.7rem 2rem;
+        border-radius: 34px;
+        background:
+            linear-gradient(135deg, rgba(255,255,255,0.76), rgba(255,255,255,0.42)),
+            linear-gradient(160deg, rgba(255, 209, 130, 0.16), rgba(87, 208, 255, 0.10));
         border: 1px solid var(--panel-border);
         box-shadow: var(--panel-shadow);
         overflow: hidden;
@@ -758,6 +882,23 @@ st.markdown(
         bottom: -70px;
         left: -10px;
     }
+    .hero-orbit {
+        position: absolute;
+        width: 420px;
+        height: 420px;
+        border-radius: 999px;
+        right: -140px;
+        top: -160px;
+        border: 1px solid rgba(255,255,255,0.48);
+        box-shadow: inset 0 0 0 40px rgba(255,255,255,0.04);
+        opacity: 0.8;
+    }
+    .hero-grid {
+        display: grid;
+        grid-template-columns: minmax(0, 1.5fr) minmax(220px, 0.8fr);
+        gap: 1.4rem;
+        align-items: center;
+    }
     .hero-kicker {
         display: inline-flex;
         align-items: center;
@@ -771,6 +912,10 @@ st.markdown(
         letter-spacing: 0.08em;
         text-transform: uppercase;
         color: #8d4a30;
+    }
+    .hero-copy {
+        position: relative;
+        z-index: 1;
     }
     .app-title {
         margin: 0.65rem 0 0.2rem 0 !important;
@@ -786,6 +931,68 @@ st.markdown(
         line-height: 1.65;
         color: var(--text);
     }
+    .hero-pills {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.6rem;
+        margin-top: 1rem;
+    }
+    .hero-pill {
+        display: inline-flex;
+        align-items: center;
+        padding: 0.55rem 0.82rem;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.7);
+        border: 1px solid rgba(255,255,255,0.84);
+        box-shadow: 0 10px 24px rgba(102, 92, 124, 0.08);
+        font-size: 0.82rem;
+        font-weight: 700;
+        color: #6e4768;
+    }
+    .hero-brand-card {
+        position: relative;
+        z-index: 1;
+        padding: 1rem;
+        border-radius: 28px;
+        background: linear-gradient(160deg, rgba(38, 31, 63, 0.95), rgba(44, 62, 99, 0.88));
+        box-shadow: 0 24px 46px rgba(40, 29, 70, 0.22);
+        border: 1px solid rgba(255,255,255,0.14);
+    }
+    .hero-brand-frame {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 180px;
+        border-radius: 22px;
+        background:
+            radial-gradient(circle at top, rgba(255, 181, 81, 0.34), transparent 34%),
+            linear-gradient(145deg, rgba(255,255,255,0.10), rgba(255,255,255,0.03));
+        border: 1px solid rgba(255,255,255,0.12);
+    }
+    .hero-logo {
+        width: min(170px, 72%);
+        aspect-ratio: 1 / 1;
+        object-fit: contain;
+        filter: drop-shadow(0 12px 24px rgba(0,0,0,0.18));
+    }
+    .hero-brand-meta {
+        display: flex;
+        flex-direction: column;
+        gap: 0.25rem;
+        margin-top: 0.85rem;
+    }
+    .hero-brand-label {
+        font-size: 0.78rem;
+        font-weight: 700;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+        color: #ffd37f;
+    }
+    .hero-brand-caption {
+        font-size: 0.92rem;
+        line-height: 1.5;
+        color: #edf4ff;
+    }
     [data-testid="stChatInput"] textarea {
         min-height: 3.25rem !important;
         font-size: 1rem !important;
@@ -796,6 +1003,9 @@ st.markdown(
         border: 1px solid rgba(255,255,255,0.86) !important;
         box-shadow: 0 18px 40px rgba(111, 95, 151, 0.14) !important;
         color: var(--headline) !important;
+    }
+    [data-testid="stChatInput"] textarea::placeholder {
+        color: #8f84a6 !important;
     }
     [data-testid="stChatInputSubmitButton"] button {
         border-radius: 999px !important;
@@ -822,6 +1032,7 @@ st.markdown(
         width: 100%;
         max-width: var(--chat-rail-width);
         margin: 0.35rem auto;
+        animation: bubble-enter 220ms ease-out;
     }
     .assistant-row {
         justify-content: flex-start;
@@ -886,6 +1097,16 @@ st.markdown(
         z-index: -1;
         filter: blur(6px);
     }
+    @keyframes bubble-enter {
+        from {
+            opacity: 0;
+            transform: translateY(8px);
+        }
+        to {
+            opacity: 1;
+            transform: translateY(0);
+        }
+    }
     @media (max-width: 900px) {
         .main .block-container {
             padding-top: 1.2rem;
@@ -893,6 +1114,15 @@ st.markdown(
         .hero-shell {
             padding: 1.5rem 1.1rem 1.15rem 1.1rem;
             border-radius: 24px;
+        }
+        .hero-grid {
+            grid-template-columns: 1fr;
+        }
+        .hero-brand-card {
+            order: -1;
+        }
+        .hero-brand-frame {
+            min-height: 140px;
         }
         .hero-subtitle {
             font-size: 0.95rem;
@@ -948,7 +1178,27 @@ components.html(
 )
 
 with st.sidebar:
-    st.header("Chats")
+    st.markdown(
+        f"""
+        <div class="sidebar-brand">
+            <div class="sidebar-brand-top">
+                <div class="sidebar-logo-wrap">
+                    <img src="{logo_uri}" alt="Neural Talk logo" class="sidebar-logo" />
+                </div>
+                <div>
+                    <p class="sidebar-brand-title">Neural Talk</p>
+                    <p class="sidebar-brand-subtitle">Color-rich local AI workspace for chat, code, and attached files.</p>
+                </div>
+            </div>
+            <div class="sidebar-meta-row">
+                <span class="sidebar-chip">{hero_chat_count} chats</span>
+                <span class="sidebar-chip">{hero_model}</span>
+            </div>
+        </div>
+        <div class="sidebar-section-label">Chats</div>
+        """,
+        unsafe_allow_html=True,
+    )
     if st.button("New Chat", use_container_width=True, type="primary"):
         chat = new_chat()
         st.session_state["chats"].insert(0, chat)
@@ -964,7 +1214,7 @@ with st.sidebar:
             st.session_state["composer_index"] += 1
             st.rerun()
 
-    st.header("Settings")
+    st.markdown('<div class="sidebar-section-label">Settings</div>', unsafe_allow_html=True)
     model_options = list_ollama_models()
     if st.session_state["model"] not in model_options:
         model_options = [st.session_state["model"], *model_options]
@@ -976,7 +1226,7 @@ with st.sidebar:
     st.text_area("System prompt", key="system_prompt", height=140)
     st.caption(f"Model in use: {st.session_state['model']}")
 
-    st.header("Advanced")
+    st.markdown('<div class="sidebar-section-label">Advanced</div>', unsafe_allow_html=True)
     st.slider("Context turns (0 = full chat memory)", 0, 20, key="context_turns")
     st.toggle("Stream output", key="stream_output")
     save_persisted_settings()
