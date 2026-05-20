@@ -484,25 +484,46 @@ def generate_reply(
             }
 
         if st.session_state["stream_output"] and hasattr(chain, "stream"):
-            chunks = []
-            for chunk in chain.stream(inputs):
-                chunks.append(str(chunk))
+            try:
+                chunks = []
+                for chunk in chain.stream(inputs):
+                    chunk_str = str(chunk).strip()
+                    if chunk_str:
+                        chunks.append(chunk_str)
+                        if on_update is not None:
+                            on_update("".join(chunks))
+                text = "".join(chunks).strip()
+                if not text:
+                    text = "(No response received)"
+                text = postprocess_code_response(text, code_mode, allow_comments=allow_comments)
                 if on_update is not None:
-                    on_update("".join(chunks))
-            text = "".join(chunks).strip()
-            text = postprocess_code_response(text, code_mode, allow_comments=allow_comments)
-            if on_update is not None:
-                on_update(text)
-            return text
+                    on_update(text)
+                return text
+            except Exception as stream_err:
+                # Fallback to invoke if streaming fails
+                try:
+                    response = chain.invoke(inputs)
+                    text = str(response).strip()
+                    text = postprocess_code_response(text, code_mode, allow_comments=allow_comments)
+                    if on_update is not None:
+                        on_update(text)
+                    return text
+                except Exception as invoke_err:
+                    error_msg = f"⚠️ Response Error: {str(invoke_err)[:200]}"
+                    if on_update is not None:
+                        on_update(error_msg)
+                    return error_msg
 
         response = chain.invoke(inputs)
         text = str(response).strip()
+        if not text:
+            text = "(No response received)"
         text = postprocess_code_response(text, code_mode, allow_comments=allow_comments)
         if on_update is not None:
             on_update(text)
         return text
     except Exception as e:
-        error_msg = f"Connection Error: Cannot reach Ollama at {st.session_state['base_url']}. Please ensure Ollama is running.\n\nDetails: {str(e)}"
+        error_msg = f"⚠️ Connection Error: Cannot reach Ollama at {st.session_state['base_url']}. Please ensure Ollama is running.\n\nDetails: {str(e)[:150]}"
         if on_update is not None:
             on_update(error_msg)
         return error_msg
@@ -541,7 +562,16 @@ def render_content_blocks(content: str, target) -> None:
         # Use Streamlit native code rendering for syntax highlighting.
         language = match.group(1).strip() or None
         code_text = match.group(2).rstrip("\n")
+        # Wrap code block in message-row for proper alignment
+        target.markdown(
+            '<div class="message-row assistant-row">',
+            unsafe_allow_html=True,
+        )
         target.code(code_text, language=language)
+        target.markdown(
+            '</div>',
+            unsafe_allow_html=True,
+        )
         last_end = match.end()
 
     # Show remaining text after last code block
@@ -565,6 +595,7 @@ def render_message(role: str, content: str, latency: float | None = None, target
             unsafe_allow_html=True,
         )
     else:
+        # For assistant, render content with code blocks properly
         render_content_blocks(content, target)
 
 
@@ -1030,9 +1061,10 @@ st.markdown(
     .message-row {
         display: flex;
         width: 100%;
-        max-width: var(--chat-rail-width);
-        margin: 0.35rem auto;
+        margin: 0.6rem 0;
         animation: bubble-enter 220ms ease-out;
+        align-items: flex-end;
+        gap: 0.5rem;
     }
     .assistant-row {
         justify-content: flex-start;
@@ -1043,40 +1075,48 @@ st.markdown(
     .user-message-bubble {
         display: inline-block;
         width: fit-content;
-        max-width: 88%;
-        padding: 0.95rem 1.15rem;
-        border-radius: 24px 24px 8px 24px;
+        max-width: 75%;
+        padding: 0.95rem 1.2rem;
+        border-radius: 24px 24px 6px 24px;
         background: var(--user-gradient);
         color: white;
         line-height: 1.5;
         word-break: break-word;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
         font-size: 0.98rem;
-        box-shadow: 0 20px 36px rgba(255, 112, 93, 0.26);
-        border: 1px solid rgba(255,255,255,0.24);
+        box-shadow: 0 18px 32px rgba(255, 80, 127, 0.28);
+        border: 1px solid rgba(255,255,255,0.26);
     }
     .assistant-message-bubble {
         display: inline-block;
         width: fit-content;
-        max-width: 88%;
-        padding: 0.95rem 1.15rem;
-        border-radius: 24px 24px 24px 8px;
+        max-width: 75%;
+        padding: 0.95rem 1.2rem;
+        border-radius: 24px 24px 24px 6px;
         background: var(--assistant-gradient);
         color: var(--headline);
         line-height: 1.65;
         word-break: break-word;
+        word-wrap: break-word;
+        overflow-wrap: break-word;
         font-size: 0.98rem;
         border: 1px solid var(--assistant-border);
-        box-shadow: 0 16px 36px rgba(94, 120, 160, 0.12);
+        box-shadow: 0 14px 32px rgba(94, 120, 160, 0.14);
         backdrop-filter: blur(10px);
+    }
+    div[data-testid="stCodeBlock"] {
+        width: fit-content;
+        max-width: 100%;
     }
     div[data-testid="stCodeBlock"] pre {
         font-size: 0.92rem !important;
         line-height: 1.6 !important;
-        border-radius: 22px !important;
+        border-radius: 16px !important;
         border: 1px solid var(--code-border) !important;
         background: var(--code-bg) !important;
-        box-shadow: 0 22px 48px rgba(17, 25, 40, 0.24) !important;
-        padding: 0.3rem !important;
+        box-shadow: 0 16px 32px rgba(17, 25, 40, 0.28) !important;
+        padding: 1rem !important;
     }
     div[data-testid="stCodeBlock"] code {
         font-family: "JetBrains Mono", "Fira Code", Menlo, Consolas, monospace !important;
@@ -1129,7 +1169,7 @@ st.markdown(
         }
         .user-message-bubble,
         .assistant-message-bubble {
-            max-width: 96%;
+            max-width: 85%;
         }
     }
     </style>

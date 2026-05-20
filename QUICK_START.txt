@@ -1,0 +1,189 @@
+╔════════════════════════════════════════════════════════════════════════════╗
+║                   NEURAL TALK - QUICK START GUIDE                           ║
+╚════════════════════════════════════════════════════════════════════════════╝
+
+🚀 FASTEST START (Recommended)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Make sure Ollama is running:
+     $ ollama serve
+
+     (Open in a NEW terminal tab)
+
+  2. In project directory, run:
+     $ ./run.sh
+
+  3. Open browser:
+     http://localhost:8501
+
+
+⚠️  IMPORTANT - BEFORE RUNNING THE APP
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  TERMINAL 1: Start Ollama
+  ┌─────────────────────────────────────┐
+  │ $ ollama serve                      │
+  │ Loading model...                    │
+  │ Listening on 127.0.0.1:11434       │
+  └─────────────────────────────────────┘
+
+  TERMINAL 2: Run the App
+  ┌─────────────────────────────────────┐
+  │ $ ./run.sh                          │
+  │ 🚀 Neural Talk - Starting...        │
+  │ Starting Streamlit app...           │
+  │ Open http://localhost:8501          │
+  └─────────────────────────────────────┘
+
+
+MANUAL STEPS (If run.sh doesn't work)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  $ source .venv/bin/activate
+  $ pip install streamlit langchain-core langchain-ollama pypdf
+  $ streamlit run app.py
+
+
+INSTALL MODELS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  $ ollama pull deepseek-coder:1.3b    (Default - Fast, Good for code)
+  $ ollama pull llama2                 (Balanced, Good for general chat)
+  $ ollama pull mistral                (Very fast)
+  $ ollama pull neural-chat            (Optimized for conversation)
+
+  List installed models:
+  $ ollama list
+
+
+UI IMPROVEMENTS MADE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ✅ Fixed message alignment (User RIGHT, AI LEFT - like ChatGPT)
+  ✅ Fixed bubble sizing & positioning
+  ✅ Fixed response generation errors
+  ✅ Better error messaging
+  ✅ Improved code block styling
+  ✅ Better mobile responsiveness
+
+
+WHAT YOU'LL SEE
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  User Message (RIGHT):               AI Response (LEFT):
+  ┌────────────────────────────┐      ┌────────────────────────────┐
+  │  What's 2+2?  ──────────> │      │ <────── 4 is the answer     │
+  │  (Gradient pink)           │      │ (Light white bubble)        │
+  └────────────────────────────┘      └────────────────────────────┘
+
+
+SETTINGS (Left Sidebar)
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  📋 Chats
+    • Create new chat
+    • Switch between conversations
+    • Recent chats appear first
+
+  ⚙️  Settings
+    • Model: Select from installed Ollama models
+    • Temperature: 0-1.0 (lower = more consistent)
+    • Max tokens: Output length
+    • System prompt: Customize AI behavior
+
+  🔧 Advanced
+    • Context turns: How many previous messages to consider
+    • Stream output: Real-time response streaming
+
+
+FEATURES
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  💬 Multiple chat threads
+  📎 File attachment support
+  🔴 Code syntax highlighting
+  🌊 Real-time response streaming
+  💾 Settings auto-saved
+  🎨 Beautiful modern UI
+
+
+TROUBLESHOOTING
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  ❌ "Cannot reach Ollama"
+     → Run: ollama serve
+
+  ❌ "No models in dropdown"
+     → Run: ollama pull deepseek-coder:1.3b
+
+  ❌ "Port 8501 already in use"
+     → Run: streamlit run app.py --server.port 8502
+
+  ❌ "PDF extraction not working"
+     → Run: pip install pypdf
+
+
+FILES PROVIDED
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  run.sh              ← Use this to start!
+  STARTUP_GUIDE.md    ← Full detailed guide
+  CHANGES.md          ← All improvements made
+  QUICK_START.txt     ← This file
+  app.py              ← Main application (IMPROVED)
+  README.md           ← Original documentation
+
+
+KEYBOARD SHORTCUTS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Enter        → Send message
+  Escape       → Clear input
+  Shift+Enter  → New line
+
+
+DEFAULT SETTINGS
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Model:       deepseek-coder:1.3b
+  Temp:        0.2 (Consistent)
+  Max tokens:  256 (Fast responses)
+  Context:     0 (Full memory)
+  Stream:      Enabled
+
+
+TECH STACK
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  Frontend:    Streamlit 1.54+
+  LLM:         Ollama (local models)
+  Chain:       LangChain
+  Language:    Python 3.10+
+
+
+SUPPORT
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  For detailed troubleshooting:
+  → Open STARTUP_GUIDE.md
+
+  For all changes made:
+  → Open CHANGES.md
+
+  For original project info:
+  → Open README.md
+
+
+✨ READY TO START?
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+  1. Make sure Ollama is running (ollama serve in another terminal)
+  2. Run: ./run.sh
+  3. Visit: http://localhost:8501
+  4. Start typing!
+
+
+═══════════════════════════════════════════════════════════════════════════════
+Version: 1.0 | Updated: May 2026 | Status: ✅ All fixes applied
+═══════════════════════════════════════════════════════════════════════════════
+
